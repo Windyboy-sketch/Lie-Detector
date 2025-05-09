@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lie Detector GUI</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+    h1 {
+      color: #333;
+    }
+    button {
+      padding: 15px 30px;
+      margin: 10px;
+      font-size: 18px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      color: white;
+    }
+    #connectButton {
+      background-color: #4CAF50;
+    }
+    #truthButton {
+      background-color: #2ecc71;
+    }
+    #lieButton {
+      background-color: #e74c3c;
+    }
+    #clearButton {
+      background-color: #7f8c8d;
+    }
+    #spinButton {
+      background-color: #e67e22;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>Lie Detector Control</h1>
+  <button id="connectButton" onclick="connectToSerial()">Connect to Arduino</button>
+  <br>
+  <button id="truthButton" onclick="sendSignal('GREEN')" disabled>Truth (Green)</button>
+  <button id="lieButton" onclick="sendSignal('RED')" disabled>Lie (Red)</button>
+  <button id="clearButton" onclick="sendSignal('CLEAR')" disabled>Clear</button>
+  <button id="spinButton" onclick="spinAndChoose()" disabled>Spin</button>
+  <p id="status">Status: Disconnected</p>
+
+  <script>
+    let port;
+    let writer;
+    const statusDisplay = document.getElementById('status');
+    const truthButton = document.getElementById('truthButton');
+    const lieButton = document.getElementById('lieButton');
+    const clearButton = document.getElementById('clearButton');
+    const spinButton = document.getElementById('spinButton');
+
+    async function connectToSerial() {
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        writer = port.writable.getWriter();
+        statusDisplay.textContent = 'Status: Connected to Arduino';
+        truthButton.disabled = false;
+        lieButton.disabled = false;
+        clearButton.disabled = false;
+        spinButton.disabled = false;
+      } catch (error) {
+        statusDisplay.textContent = 'Status: Failed to connect - ' + error.message;
+      }
+    }
+
+    async function sendSignal(color) {
+      if (writer) {
+        try {
+          const encoder = new TextEncoder();
+          await writer.write(encoder.encode(color + '\n'));
+          statusDisplay.textContent = `Status: Sent ${color} signal`;
+        } catch (error) {
+          statusDisplay.textContent = 'Status: Failed to send signal - ' + error.message;
+        }
+      } else {
+        statusDisplay.textContent = 'Status: Not connected to Arduino';
+      }
+    }
+
+    async function spinAndChoose() {
+      if (writer) {
+        try {
+          const encoder = new TextEncoder();
+          // Rapidly cycle between red and green for 1 second
+          const startTime = Date.now();
+          while (Date.now() - startTime < 1000) {
+            await writer.write(encoder.encode('RED\n'));
+            await new Promise(resolve => setTimeout(resolve, 100));
+            await writer.write(encoder.encode('GREEN\n'));
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          // Randomly choose final state
+          const signals = ['GREEN', 'RED'];
+          const finalSignal = signals[Math.floor(Math.random() * signals.length)];
+          await writer.write(encoder.encode(finalSignal + '\n'));
+          statusDisplay.textContent = `Status: Spun and landed on ${finalSignal}`;
+        } catch (error) {
+          statusDisplay.textContent = 'Status: Failed to spin - ' + error.message;
+        }
+      } else {
+        statusDisplay.textContent = 'Status: Not connected to Arduino';
+      }
+    }
+  </script>
+</body>
+</html>
